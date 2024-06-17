@@ -1,14 +1,18 @@
 const userService = require('./user.service');
 const tokenService = require('./token.service');
-const {Token} = require('../models');
+const {MsqlToken} = require('../models');
 const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
 const httpStatus = require('http-status');
 
+
 // Login with email and password
 const loginWithEmailAndPassword = async(email, password)=>{
     const user = await userService.getUserByEmail(email);
+     
     if(!user || !(await user.isPasswordMatch(password))){
+      // console.log(user)
+      // console.log(IsPasswordMatch)
         throw new ApiError(httpStatus.UNAUTHORIZED, 'Incorrect email or password');
     }
     return user;
@@ -16,12 +20,11 @@ const loginWithEmailAndPassword = async(email, password)=>{
 
 // Logout
 const logout = async(refreshToken)=>{
-    const refreshTokenDoc = await Token.findOne({token: refreshToken, type: tokenTypes.REFRESH, blacklisted: false});
+    const refreshTokenDoc = await MsqlToken.findOne({token: refreshToken, type: tokenTypes.REFRESH, blacklisted: false});
     if(!refreshTokenDoc){
         throw new ApiError(httpStatus.NOT_FOUND, 'Invalid or expired refresh token');
     }
-    console.log(refreshTokenDoc instanceof mongoose.Model);
-    await refreshTokenDoc.deleteOne();
+    await refreshTokenDoc.destroy({force: true});
 }
 
 // Refresh auth tokens
@@ -32,7 +35,7 @@ const refreshAuth = async (refreshToken) => {
       if (!user) {
         throw new Error();
       }
-      await refreshTokenDoc.remove();
+      await refreshTokenDoc.destroy({force: true});
       return tokenService.generateAuthTokens(user);
     } catch (error) {
       throw new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate');
@@ -43,13 +46,15 @@ const refreshAuth = async (refreshToken) => {
 const resetPassword = async (resetPasswordToken, newPassword) => {
     try {
       const resetPasswordTokenDoc = await tokenService.verifyToken(resetPasswordToken, tokenTypes.RESET_PASSWORD);
-      const user = await userService.getUserById(resetPasswordTokenDoc.user);
+      console.log(resetPasswordTokenDoc.dataValues.userId)
+      const user = await userService.getUserById(resetPasswordTokenDoc.dataValues.userId);
       if (!user) {
         throw new Error();
       }
       await userService.updateUserById(user.id, { password: newPassword });
-      await Token.deleteMany({ user: user.id, type: tokenTypes.RESET_PASSWORD });
+      await MsqlToken.destroy({where: {userId: user.id, type: tokenTypes.RESET_PASSWORD}});
     } catch (error) {
+      console.log(error)
       throw new ApiError(httpStatus.UNAUTHORIZED, 'Password reset failed');
     }
   };
@@ -62,12 +67,13 @@ const resetPassword = async (resetPasswordToken, newPassword) => {
         if (!user) {
           throw new Error();
         }
-        await Token.deleteMany({ user: user.id, type: tokenTypes.VERIFY_EMAIL });
+        await MsqlToken.destroy({where: {userId: user.id, type: tokenTypes.VERIFY_EMAIL}});
         await userService.updateUserById(user.id, { isEmailVerified: true });
-      } catch (error) {
-        throw new ApiError(httpStatus.UNAUTHORIZED, 'Email verification failed');
-      }
-  }
+    }
+    catch (error) {
+      throw new ApiError(httpStatus.UNAUTHORIZED, 'Email verification failed');
+    }
+    }
 
 module.exports = {
     loginWithEmailAndPassword,
@@ -75,4 +81,4 @@ module.exports = {
     refreshAuth,
     resetPassword,
     verifyEmail,
-}
+};

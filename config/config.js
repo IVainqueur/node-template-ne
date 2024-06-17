@@ -8,7 +8,6 @@ const envVarsSchema = Joi.object()
 .keys({
     NODE_ENV: Joi.string().valid('production', 'development', 'test').required(),
     PORT: Joi.number().default(3000),
-    MONGODB_URL: Joi.string().required().description('Mongo DB URL'),
     //jwt
     JWT_SECRET: Joi.string().required().description('JWT secret key'),
     JWT_ACCESS_EXPIRATION_MINUTES: Joi.number().default(30).description('minutes after which access tokens expire'),
@@ -31,12 +30,6 @@ const envVarsSchema = Joi.object()
     MYSQL_USER: Joi.string().description('mysql user'),
     MYSQL_PASSWORD: Joi.optional().description('mysql password'),
     MYSQL_DATABASE: Joi.string().description('mysql database'),
-    //postgres
-    POSTGRES_HOST: Joi.string().description('postgres host'),
-    POSTGRES_PORT: Joi.number().description('postgres port'),
-    POSTGRES_USER: Joi.string().description('postgres user'),
-    POSTGRES_PASSWORD: Joi.string().description('postgres password'),
-    POSTGRES_DATABASE: Joi.string().description('postgres database'),
 })
 .unknown();
 
@@ -49,13 +42,6 @@ if (error) {
 module.exports = {
     env: envVars.NODE_ENV,
     port: envVars.PORT,
-    mongoose: {
-      url: envVars.MONGODB_URL + (envVars.NODE_ENV === 'test' ? '-test' : ''),
-      options: {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      },
-    },
     jwt: {
       secret: envVars.JWT_SECRET,
       accessExpirationMinutes: envVars.JWT_ACCESS_EXPIRATION_MINUTES,

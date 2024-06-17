@@ -1,53 +1,84 @@
 const httpStatus = require('http-status');
-const { User } = require('../models');
+const {MsqlUser} = require('../models');
 const ApiError = require('../utils/ApiError');
+const logger = require('../config/logger');
 
 // Create a new user
-const createUser = async (userBody)=> {
-    if(await User.isEmailTaken(userBody.email)){
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+const createUser = async (userBody) => {
+    try {
+        if(await MsqlUser.isEmailTaken(userBody.email)){
+            throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+        }
+        return MsqlUser.create(userBody);
+    } catch (error) {
+        logger.error(error);
+        throw error;
     }
-    return User.create(userBody);
 }
 
 // Get all users
 const getUsers = async(filter, options) =>{
-    const users = await User.paginate(filter, options);
-    return users;
+    try {
+        const users = await MsqlUser.paginate(filter, options);
+        return users;
+    } catch (error) {
+        logger.error(error);
+        throw error;
+    }
 }
 
 // Get user by id
 const getUserById = async(userId) =>{
-    return User.findById(userId);
+    try {
+        return MsqlUser.findOne({userId});
+    } catch (error) {
+        logger.error(error);
+        throw error;
+    }
 }
 
 // Get user by email
 const getUserByEmail = async(email) =>{
-    return User.findOne({email});
-}
+    try {
+        return MsqlUser.findOne({where:{email}});
+    } catch (error) {
+        logger.error(error);
+        throw error;
+    }
+}   
 
 // Update user by id
 const updateUserById = async(userId, updateBody) =>{
-    const user = await getUserById(userId);
-    if(!user){
-        throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+    try {
+        const user = await getUserById(userId);
+        if(!user){
+            throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+        }
+        if(updateBody.email && (await MsqlUser.isEmailTaken(updateBody.email, userId))){
+            throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
+        }
+        Object.assign(user, updateBody);
+        await user.save();
+        return user;
+    } catch (error) {
+        logger.error(error);
+        throw error;
     }
-    if(updateBody.email && (await User.isEmailTaken(updateBody.email, userId))){
-        throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
-    }
-    Object.assign(user, updateBody);
-    await user.save();
-    return user;
 }
 
 // Delete user by id
 const deleteUserById = async(userId) =>{
-    const user = await getUserById(userId);
-    if(!user){
-        throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+    try {
+        const user = await getUserById(userId);
+        if(!user){
+            throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+        }
+        await user.destroy({force: true});
+        return user;
+    } catch (error) {
+        logger.error(error);
+        throw error;
     }
-    await user.deleteOne();
-    return user;
 }
 
 module.exports = {
